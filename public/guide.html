@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EDI 834 Format Guide</title>
+<script>
+  (function () {
+    try {
+      var raw = localStorage.getItem("edi834_app_settings_v1");
+      var settings = raw ? JSON.parse(raw) : {};
+      var theme = settings.theme || "system";
+      var isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      if (isDark) document.documentElement.classList.add("dark");
+    } catch (e) {}
+  })();
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: "class" };
+</script>
+<style>
+  .seg-id { color: #0369a1; font-weight: 700; }
+  .dark .seg-id { color: #38bdf8; }
+  .seg-elem { color: #1e293b; }
+  .dark .seg-elem { color: #e2e8f0; }
+  .seg-delim { color: #94a3b8; }
+  .dark .seg-delim { color: #64748b; }
+  .segment-example {
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+  .dark .segment-example {
+    background: #0f172a;
+    border-color: #334155;
+  }
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 text-sm dark:bg-slate-950 dark:text-slate-200">
+
+  <div class="flex min-h-screen">
+    <!-- TOC sidebar -->
+    <aside class="w-72 shrink-0 bg-slate-900 text-slate-200 p-4 sticky top-0 h-screen overflow-y-auto hidden md:block">
+      <a href="/" class="inline-block text-xs text-emerald-400 hover:text-emerald-300 mb-4">&larr; Back to workspace</a>
+      <h1 class="text-base font-bold text-white mb-1">EDI 834 Format Guide</h1>
+      <p class="text-xs text-slate-400 mb-4">Every segment this app reads, writes, and validates — with real examples.</p>
+
+      <button id="btn-load-demo"
+        class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-md transition-colors text-xs mb-5">
+        Load Full Demo File
+      </button>
+
+      <nav class="space-y-4 text-xs">
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Basics</div>
+          <a href="#basics" class="block py-1 text-slate-300 hover:text-white">How X12 is structured</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Envelope</div>
+          <a href="#isa" class="block py-1 text-slate-300 hover:text-white">ISA — Interchange Header</a>
+          <a href="#gs" class="block py-1 text-slate-300 hover:text-white">GS — Functional Group Header</a>
+          <a href="#st-bgn" class="block py-1 text-slate-300 hover:text-white">ST / BGN — Transaction Start</a>
+          <a href="#trailers" class="block py-1 text-slate-300 hover:text-white">SE / GE / IEA — Trailers</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Loop 1000A/1000B — Header</div>
+          <a href="#n1-header" class="block py-1 text-slate-300 hover:text-white">N1 — Sponsor &amp; Payer</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Loop 2000 — Member</div>
+          <a href="#ins" class="block py-1 text-slate-300 hover:text-white">INS — Member Level Detail</a>
+          <a href="#dtp-007" class="block py-1 text-slate-300 hover:text-white">DTP*007 — Maintenance Effective Date</a>
+          <a href="#ref-0f" class="block py-1 text-slate-300 hover:text-white">REF*0F — Member ID</a>
+          <a href="#ref-additional" class="block py-1 text-slate-300 hover:text-white">REF — Additional References</a>
+          <a href="#nm1-il" class="block py-1 text-slate-300 hover:text-white">NM1*IL — Member Name</a>
+          <a href="#dmg" class="block py-1 text-slate-300 hover:text-white">DMG — Demographics</a>
+          <a href="#n3-n4" class="block py-1 text-slate-300 hover:text-white">N3 / N4 — Address</a>
+          <a href="#mailing-address" class="block py-1 text-slate-300 hover:text-white">Mailing Address (Loop 2100C)</a>
+          <a href="#responsible-party" class="block py-1 text-slate-300 hover:text-white">Responsible Party (Loop 2100F)</a>
+          <a href="#per-member" class="block py-1 text-slate-300 hover:text-white">PER*IP — Member Contact Info</a>
+          <a href="#languages" class="block py-1 text-slate-300 hover:text-white">Languages — Speak / Write / Read</a>
+          <a href="#dependents" class="block py-1 text-slate-300 hover:text-white">Dependents (nested Loop 2000)</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Loop 2300 — Health Coverage</div>
+          <a href="#hd" class="block py-1 text-slate-300 hover:text-white">HD — Coverage</a>
+          <a href="#dtp" class="block py-1 text-slate-300 hover:text-white">DTP — Coverage Dates</a>
+          <a href="#ref-custom" class="block py-1 text-slate-300 hover:text-white">REF — Custom LOB Reference</a>
+          <a href="#hios-id" class="block py-1 text-slate-300 hover:text-white">REF*18 — HIOS Plan ID</a>
+          <a href="#amt" class="block py-1 text-slate-300 hover:text-white">AMT — Premium Amount</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Loop 2310 — Provider</div>
+          <a href="#provider" class="block py-1 text-slate-300 hover:text-white">LX / NM1*P3 / PER</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Loop 2320/2330 — COB</div>
+          <a href="#cob" class="block py-1 text-slate-300 hover:text-white">COB / NM1*IN</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Loop 2700/2750 — Reporting</div>
+          <a href="#reporting" class="block py-1 text-slate-300 hover:text-white">LS / N1*75 / REF / LE</a>
+        </div>
+        <div>
+          <div class="uppercase tracking-wide text-slate-500 font-semibold mb-1">Full Example</div>
+          <a href="#full-example" class="block py-1 text-slate-300 hover:text-white">Complete 834 file</a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-1 max-w-4xl mx-auto px-6 py-10 space-y-12">
+
+      <a href="/" class="md:hidden inline-block text-xs text-emerald-600 dark:text-emerald-400 mb-2">&larr; Back to workspace</a>
+
+      <section id="basics">
+        <h2 class="text-xl font-bold mb-3">How an X12 834 file is structured</h2>
+        <p class="mb-3">An 834 file is plain text made of <strong>segments</strong>, each ending in a tilde
+          (<code class="px-1 bg-slate-200 dark:bg-slate-800 rounded">~</code>), the <strong>segment terminator</strong>.
+          Inside a segment, individual <strong>elements</strong> are separated by an asterisk
+          (<code class="px-1 bg-slate-200 dark:bg-slate-800 rounded">*</code>), the <strong>element separator</strong>.
+          The first element is always the segment's tag — <code>ISA</code>, <code>NM1</code>, <code>HD</code>, and so on —
+          which tells you what kind of data follows.</p>
+        <div class="segment-example">NM1*IL*1*Doe*Jane****34*123456789~</div>
+        <p class="mt-3">Segments are grouped into <strong>loops</strong> — repeating blocks that describe one
+          logical thing, like one member or one coverage. This app's Editor Settings let you toggle whether
+          each segment gets its own line, and whether long segments wrap — that's purely cosmetic and has
+          zero effect on the underlying data or on other systems reading the file.</p>
+        <p class="mt-3 text-slate-600 dark:text-slate-400 text-xs">Note: this app implements a practical, simplified
+          subset of the real X12 834 (005010X220A1) implementation guide — enough to model members, dependents,
+          coverages, payments, providers, coordination of benefits, and reporting categories with correct segment
+          structure. It is not a certified/complete implementation of every loop in the full spec.</p>
+      </section>
+
+      <section id="isa">
+        <h2 class="text-xl font-bold mb-1">ISA — Interchange Control Header</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">The very first segment of any X12 file. Identifies who
+          sent the interchange and who it's addressed to, using fixed-width sender/receiver IDs.
+          Maps to the <strong>Sender ID</strong> / <strong>Receiver ID</strong> / <strong>Control Number</strong>
+          fields in the Header section of the form.</p>
+        <div class="segment-example">ISA*00*          *00*          *ZZ*SENDERID       *ZZ*RECEIVERID     *260803*1200*^*00501*000000001*0*T*:~</div>
+        <table class="w-full text-xs mt-3 border-collapse">
+          <thead><tr class="text-left text-slate-500 dark:text-slate-400">
+            <th class="py-1 pr-3">Pos.</th><th class="py-1 pr-3">Element</th><th class="py-1 pr-3">Example</th><th class="py-1">Meaning</th>
+          </tr></thead>
+          <tbody class="align-top">
+            <tr><td class="py-1 pr-3">ISA06</td><td class="py-1 pr-3">Sender ID</td><td class="py-1 pr-3 font-mono">SENDERID</td><td class="py-1">Space-padded to 15 characters</td></tr>
+            <tr><td class="py-1 pr-3">ISA08</td><td class="py-1 pr-3">Receiver ID</td><td class="py-1 pr-3 font-mono">RECEIVERID</td><td class="py-1">Space-padded to 15 characters</td></tr>
+            <tr><td class="py-1 pr-3">ISA13</td><td class="py-1 pr-3">Control Number</td><td class="py-1 pr-3 font-mono">000000001</td><td class="py-1">Zero-padded to 9 digits, must match IEA02</td></tr>
+            <tr><td class="py-1 pr-3">ISA15</td><td class="py-1 pr-3">Usage Indicator</td><td class="py-1 pr-3 font-mono">T</td><td class="py-1"><code>T</code> = test, <code>P</code> = production</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="gs">
+        <h2 class="text-xl font-bold mb-1">GS — Functional Group Header</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Wraps one or more transaction sets of the same type
+          (here, always 834s) inside the interchange. <code>005010X220A1</code> identifies this as the 834 Benefit
+          Enrollment and Maintenance implementation guide version.</p>
+        <div class="segment-example">GS*BE*SENDERID*RECEIVERID*20260803*1200*1*X*005010X220A1~</div>
+      </section>
+
+      <section id="st-bgn">
+        <h2 class="text-xl font-bold mb-1">ST / BGN — Transaction Set Start</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400"><code>ST</code> marks the start of one 834 transaction
+          (<code>834</code> = Benefit Enrollment and Maintenance). <code>BGN</code> gives it a reference number and
+          a creation date/time — this reuses the same Control Number field as the header.</p>
+        <div class="segment-example">ST*834*0001~
+BGN*00*1*20260803*1200***4~</div>
+      </section>
+
+      <section id="n1-header">
+        <h2 class="text-xl font-bold mb-1">N1 — Sponsor &amp; Payer (Loop 1000A / 1000B)</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Two <code>N1</code> segments identify the parties
+          in this exchange: <code>P5</code> is the <strong>Sponsor</strong> (the employer or plan sponsor), and
+          <code>IN</code> is the <strong>Insurer/Payer</strong> (who administers the coverage). Both map directly to
+          the Header (Loop 1000A / 1000B) section of the form.</p>
+        <div class="segment-example">N1*P5*Acme Corp*FI*123456789~
+N1*IN*Blue Shield Health Plan*FI*987654321~</div>
+      </section>
+
+      <section id="ins">
+        <h2 class="text-xl font-bold mb-1">INS — Member Level Detail (Loop 2000)</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Opens a new person's record — either the subscriber
+          (member) or one of their dependents. INS02 is the <strong>Relationship Code</strong>
+          (<code>18</code>=Self, <code>01</code>=Spouse, <code>19</code>=Child, etc.), INS03 is the
+          <strong>Maintenance Type Code</strong> (<code>021</code>=Addition, <code>001</code>=Change,
+          <code>024</code>=Termination, ...). INS01 is <code>Y</code> for the subscriber and <code>N</code> for
+          every dependent — that single flag is what tells the parser (and this app) where one person's Loop 2000
+          ends and the next one begins.</p>
+        <div class="segment-example">INS*Y*18*021*AI***FT~</div>
+      </section>
+
+      <section id="dtp-007">
+        <h2 class="text-xl font-bold mb-1">DTP*007 — Maintenance Effective Date</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Immediately follows <code>INS</code>. Qualifier
+          <code>007</code> = "Effective Date" — the date this specific maintenance action (the addition, change,
+          or termination named in INS03) actually takes effect. This is distinct from the <code>DTP*348</code>/
+          <code>DTP*349</code> coverage start/end dates further down in Loop 2300 — this one is about the
+          <em>enrollment transaction</em>, not the <em>coverage period</em>. Only emitted when a value is entered.</p>
+        <div class="segment-example">DTP*007*D8*20260101~</div>
+      </section>
+
+      <section id="ref-0f">
+        <h2 class="text-xl font-bold mb-1">REF*0F — Subscriber/Member ID</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">The qualifier <code>0F</code> means "this REF is a
+          member/subscriber identification number." Maps to <strong>Member ID</strong> on the form.</p>
+        <div class="segment-example">REF*0F*MBR1002345~</div>
+      </section>
+
+      <section id="ref-additional">
+        <h2 class="text-xl font-bold mb-1">REF — Additional References</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Any number of extra <code>REF</code> segments can
+          follow <code>REF*0F</code> for identifiers that don't fit the other qualifiers — a group number
+          (<code>1L</code>), case number (<code>3H</code>), client number (<code>23</code>), and so on. Add as
+          many as needed in the "Additional References" section of the Member card; each becomes one REF line.
+          On parse, any REF at the member level that isn't <code>0F</code> and isn't already inside a coverage
+          or reporting-category context is treated as one of these.</p>
+        <div class="segment-example">REF*1L*GRP4021~
+REF*3H*CASE9981~</div>
+      </section>
+
+      <section id="nm1-il">
+        <h2 class="text-xl font-bold mb-1">NM1*IL — Member Name</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400"><code>IL</code> identifies this as the "Insured or
+          Subscriber" name segment. <code>34</code> in position 8 is the ID qualifier for a Social Security Number,
+          with the SSN itself in position 9.</p>
+        <div class="segment-example">NM1*IL*1*Doe*Jane*A***34*123456789~</div>
+        <table class="w-full text-xs mt-3 border-collapse">
+          <thead><tr class="text-left text-slate-500 dark:text-slate-400">
+            <th class="py-1 pr-3">Pos.</th><th class="py-1 pr-3">Element</th><th class="py-1">Example</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="py-1 pr-3">NM103</td><td class="py-1 pr-3">Last Name</td><td class="py-1 font-mono">Doe</td></tr>
+            <tr><td class="py-1 pr-3">NM104</td><td class="py-1 pr-3">First Name</td><td class="py-1 font-mono">Jane</td></tr>
+            <tr><td class="py-1 pr-3">NM105</td><td class="py-1 pr-3">Middle Name</td><td class="py-1 font-mono">A</td></tr>
+            <tr><td class="py-1 pr-3">NM109</td><td class="py-1 pr-3">SSN</td><td class="py-1 font-mono">123456789</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="dmg">
+        <h2 class="text-xl font-bold mb-1">DMG — Demographics</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Date of birth (format <code>D8</code> = CCYYMMDD) and
+          gender (<code>M</code>/<code>F</code>/<code>U</code>).</p>
+        <div class="segment-example">DMG*D8*19850612*F~</div>
+      </section>
+
+      <section id="n3-n4">
+        <h2 class="text-xl font-bold mb-1">N3 / N4 — Address</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400"><code>N3</code> carries the street address,
+          <code>N4</code> carries city, state, and ZIP.</p>
+        <div class="segment-example">N3*123 Main Street~
+N4*Springfield*IL*62704~</div>
+      </section>
+
+      <section id="mailing-address">
+        <h2 class="text-xl font-bold mb-1">Mailing Address — Loop 2100C</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">A second address, used when mail should go somewhere
+          different from the residential address above (a PO box, a relative's address, etc.). It's its own
+          mini-loop: an <code>NM1*31</code> segment (entity type <code>2</code>, no name — it exists purely to
+          mark "the next N3/N4 pair is the mailing address") followed by one N3/N4 pair. Only emitted if at
+          least one mailing-address field is filled in on the form.</p>
+        <div class="segment-example">NM1*31*2~
+N3*PO Box 500~
+N4*Chicago*IL*60601~</div>
+      </section>
+
+      <section id="responsible-party">
+        <h2 class="text-xl font-bold mb-1">Responsible Party — Loop 2100F</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Names a guardian or other financially-responsible
+          person distinct from the member — common for minors or dependents who aren't the policyholder.
+          Qualifier <code>GD</code> identifies the entity as the responsible party; its name comes right in the
+          <code>NM1</code> segment, followed by its own N3/N4 address pair. Only emitted if a name or address is
+          entered.</p>
+        <div class="segment-example">NM1*GD*1*Doe*John~
+N3*789 Elm St~
+N4*Aurora*IL*60502~</div>
+      </section>
+
+      <section id="per-member">
+        <h2 class="text-xl font-bold mb-1">PER*IP — Member Contact Info</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">The member's own phone and/or email — qualifier
+          <code>IP</code> distinguishes this from the provider's contact segment in Loop 2310 (which uses
+          <code>IC</code>). Only the pairs that are actually filled in get emitted, so the position of
+          <code>EM</code>/email shifts depending on whether a phone number precedes it — the parser scans for
+          <code>TE</code>/<code>EM</code> qualifiers rather than assuming fixed positions.</p>
+        <div class="segment-example">PER*IP**TE*3125551234*EM*jane@example.com~</div>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Email only, no phone: <code>PER*IP**EM*jane@example.com~</code></p>
+      </section>
+
+      <section id="languages">
+        <h2 class="text-xl font-bold mb-1">Languages — Speak / Write / Read</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Three fixed slots, one per proficiency type, each its
+          own <code>LUI</code> segment: <code>LUI01</code> is always <code>LE</code> (Language),
+          <code>LUI02</code> is the language code, <code>LUI03</code> is left blank, and <code>LUI04</code>
+          carries a proficiency number — <code>5</code> = Speak, <code>6</code> = Write, <code>7</code> = Read.
+          On the form this is one compact row: a checkbox and a small language dropdown per slot. A slot's LUI
+          line is only emitted while its checkbox is checked (i.e. its code is non-empty).</p>
+        <div class="segment-example">LUI*LE*ENG**5~
+LUI*LE*ENG**6~
+LUI*LE*ENG**7~</div>
+      </section>
+
+      <section id="dependents">
+        <h2 class="text-xl font-bold mb-1">Dependents — a nested Loop 2000</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Each dependent is its own complete Loop 2000
+          (INS/REF/NM1/DMG/N3/N4/coverages), placed right after the subscriber's. The only structural difference
+          is INS01 = <code>N</code> and a dependent relationship code such as <code>19</code> (Child).</p>
+        <div class="segment-example">INS*N*19*021*AI***FT~
+REF*0F*~
+NM1*IL*1*Doe*Sam****34*~
+DMG*D8**U~
+N3*~
+N4***~</div>
+      </section>
+
+      <section id="hd">
+        <h2 class="text-xl font-bold mb-1">HD — Health Coverage (Loop 2300)</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">One HD segment per coverage a member has. HD01 is the
+          maintenance type, HD03 is the <strong>Insurance Line Code</strong> (comes from the LOB rule's X12 code
+          in LOB Mapping Settings — e.g. <code>HLT</code> for Medical), HD04 is a free-text plan description, and
+          HD05 is the <strong>Coverage Level</strong> (<code>IND</code>=Individual, <code>FAM</code>=Family, ...).</p>
+        <div class="segment-example">HD*021**HLT*Medical*IND~</div>
+      </section>
+
+      <section id="dtp">
+        <h2 class="text-xl font-bold mb-1">DTP — Coverage Dates</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Qualifier <code>348</code> is the coverage
+          <strong>Start Date</strong>, <code>349</code> is the <strong>End Date</strong>. Both use format
+          <code>D8</code> and are only emitted when the form field is actually filled in.</p>
+        <div class="segment-example">DTP*348*D8*20260101~
+DTP*349*D8*20261231~</div>
+      </section>
+
+      <section id="ref-custom">
+        <h2 class="text-xl font-bold mb-1">REF — Custom LOB Reference</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">If a Line of Business rule (see LOB Mapping Settings)
+          has "custom REF segment" enabled, its qualifier and the coverage's Reference Value produce one more
+          REF line here — e.g. a group or class-of-contract number.</p>
+        <div class="segment-example">REF*CE*GRP4488~</div>
+      </section>
+
+      <section id="hios-id">
+        <h2 class="text-xl font-bold mb-1">REF*18 — HIOS Plan ID</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">For ACA Health Insurance Marketplace enrollments, plans
+          are identified by a CMS-issued HIOS ID (a 14-character code like <code>12345OH1234567</code> — issuer ID
+          + product/plan variant). Qualifier <code>18</code> ("Plan Number") carries it. This is independent of
+          the LOB rule's own custom REF above — a coverage can have both.</p>
+        <div class="segment-example">REF*18*12345OH1234567~</div>
+      </section>
+
+      <section id="amt">
+        <h2 class="text-xl font-bold mb-1">AMT — Premium Amount</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Qualifier <code>P5</code> = premium amount. Only
+          emitted when a Premium Amount is entered on the coverage. Maps to the "Payment (AMT)" section of the
+          coverage card.</p>
+        <div class="segment-example">AMT*P5*425.50~</div>
+      </section>
+
+      <section id="provider">
+        <h2 class="text-xl font-bold mb-1">Provider — Loop 2310</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Only emitted when a Provider Name or NPI is entered.
+          <code>LX</code> is just a loop counter. <code>NM1*P3</code> identifies the Primary Care Provider —
+          entity type <code>2</code> means "organization" (a single combined name field, no first/last split),
+          and qualifier <code>XX</code> in position 8 means "the next value is an NPI." <code>PER</code> carries
+          a phone number (qualifier <code>TE</code>) if one was entered.</p>
+        <div class="segment-example">LX*1~
+NM1*P3*2*Dr Smith Family Clinic*****XX*1234567890~
+PER*IC**TE*3125551234~</div>
+      </section>
+
+      <section id="cob">
+        <h2 class="text-xl font-bold mb-1">Coordination of Benefits — Loop 2320/2330</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Only emitted when a Payer Responsibility code or Other
+          Payer Name is entered. <code>COB01</code> is the <strong>Payer Responsibility Sequence</strong>
+          (<code>P</code>=Primary, <code>S</code>=Secondary, <code>T</code>=Tertiary). The following
+          <code>NM1*IN</code> names the other payer, with qualifier <code>PI</code> for its payer ID.</p>
+        <div class="segment-example">COB*S~
+NM1*IN*2*Other Health Plan Inc*****PI*OP99887~</div>
+      </section>
+
+      <section id="reporting">
+        <h2 class="text-xl font-bold mb-1">Reporting Categories — Loop 2700/2750</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">A member-level loop for payer-defined reporting
+          buckets (division, union, class, ...), only emitted if at least one Reporting Category was added.
+          <code>LS*2700</code> / <code>LE*2700</code> bracket the whole loop. Each category starts with its own
+          <code>LX</code> assigned number (<code>1</code>, <code>2</code>, ... — restarting at 1 for each member),
+          followed by <code>N1*75</code> (description) and a <code>REF</code> (qualifier + value), and optionally
+          ends with a <code>DTP*007</code> effective date for that specific category — only emitted if a date was
+          entered. On the form this whole loop is one compact editable table: Description / Qualifier / Value /
+          Effective Date per row.</p>
+        <div class="segment-example">LS*2700~
+LX*1~
+N1*75*Division~
+REF*17*WEST~
+DTP*007*D8*20260101~
+LX*2~
+N1*75*Union Code~
+REF*ZZ*LOCAL42~
+LE*2700~</div>
+      </section>
+
+      <section id="trailers">
+        <h2 class="text-xl font-bold mb-1">SE / GE / IEA — Trailers</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">Every envelope segment gets a matching trailer that
+          closes it out and states a count, so a receiver can verify nothing was truncated in transit.
+          <code>SE01</code> is the total segment count from <code>ST</code> through <code>SE</code> inclusive;
+          <code>GE</code>/<code>IEA</code> control numbers must match their opening <code>GS</code>/<code>ISA</code>.</p>
+        <div class="segment-example">SE*22*0001~
+GE*1*1~
+IEA*1*000000001~</div>
+      </section>
+
+      <section id="full-example">
+        <h2 class="text-xl font-bold mb-3">Complete example</h2>
+        <p class="mb-3 text-slate-600 dark:text-slate-400">One subscriber with a dependent, a Medical coverage
+          carrying a premium, provider, and coordination of benefits, plus one reporting category — everything
+          above, assembled into one valid 834 file. (Want to see every field populated across multiple members
+          at once? Click <strong>Load Full Demo File</strong> at the top of this page.)</p>
+        <div class="segment-example">ISA*00*          *00*          *ZZ*SENDERID       *ZZ*RECEIVERID     *260803*1200*^*00501*000000001*0*T*:~
+GS*BE*SENDERID*RECEIVERID*20260803*1200*1*X*005010X220A1~
+ST*834*0001~
+BGN*00*1*20260803*1200***4~
+N1*P5*Acme Corp*FI*123456789~
+N1*IN*Blue Shield Health Plan*FI*987654321~
+INS*Y*18*021*AI***FT~
+DTP*007*D8*20260101~
+REF*0F*MBR1002345~
+REF*1L*GRP4021~
+LUI*LE*ENG**5~
+NM1*IL*1*Doe*Jane*A***34*123456789~
+DMG*D8*19850612*F~
+N3*123 Main Street~
+N4*Springfield*IL*62704~
+NM1*31*2~
+N3*PO Box 500~
+N4*Chicago*IL*60601~
+NM1*GD*1*Doe*John~
+N3*789 Elm St~
+N4*Aurora*IL*60502~
+PER*IP**TE*3125551234*EM*jane.doe@example.com~
+HD*021**HLT*Medical*IND~
+DTP*348*D8*20260101~
+DTP*349*D8*20261231~
+REF*CE*GRP4488~
+REF*18*12345OH1234567~
+AMT*P5*425.50~
+LX*1~
+NM1*P3*2*Dr Smith Family Clinic*****XX*1234567890~
+PER*IC**TE*3125559876~
+COB*S~
+NM1*IN*2*Other Health Plan Inc*****PI*OP99887~
+LS*2700~
+LX*1~
+N1*75*Division~
+REF*17*WEST~
+DTP*007*D8*20260101~
+LE*2700~
+INS*N*19*021*AI***FT~
+REF*0F*~
+NM1*IL*1*Doe*Sam****34*~
+DMG*D8**U~
+N3*~
+N4***~
+SE*44*0001~
+GE*1*1~
+IEA*1*000000001~</div>
+      </section>
+
+      <div class="h-10"></div>
+    </main>
+  </div>
+
+  <script>
+    // Colorizes every .segment-example block the same way the app's raw editor does:
+    // first element (the tag) in blue/bold, everything else in the normal element color,
+    // delimiters muted — so examples on this page look exactly like what you'll see in the app.
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function colorizeLine(line) {
+      let body = line;
+      let tail = "";
+      if (body.endsWith("~")) {
+        tail = '<span class="seg-delim">~</span>';
+        body = body.slice(0, -1);
+      }
+      const parts = body.split("*");
+      return parts.map((p, i) => (i === 0
+        ? `<span class="seg-id">${escapeHtml(p)}</span>`
+        : `<span class="seg-delim">*</span><span class="seg-elem">${escapeHtml(p)}</span>`)).join("") + tail;
+    }
+    document.querySelectorAll(".segment-example").forEach((el) => {
+      const lines = el.textContent.split("\n");
+      el.innerHTML = lines.map(colorizeLine).join("\n");
+    });
+
+    // Demo file: two subscribers (one with a dependent), every field this app
+    // supports populated at least once — header, DTP*007, additional REFs, LUI,
+    // member PER contact, multiple coverages with payment/provider/COB, and
+    // reporting categories.
+    const DEMO_PAYLOAD = {
+      header: {
+        senderId: "ACMEHOLDINGS", receiverId: "BLUESHIELDPLAN", controlNumber: "1",
+        usageIndicator: "T", sponsorName: "Acme Holdings Corp", sponsorId: "123456789",
+        payerName: "Blue Shield Health Plan", payerId: "987654321",
+      },
+      members: [
+        {
+          memberId: "MBR1002345", relationshipCode: "18", maintenanceTypeCode: "021",
+          maintenanceEffectiveDate: "2026-01-01",
+          firstName: "Robert", lastName: "Johnson", middleName: "James", ssn: "111223333",
+          gender: "M", dob: "1980-04-12",
+          languages: { speak: "ENG", write: "ENG", read: "SPA" },
+          address: { line1: "123 Main Street", city: "Springfield", state: "IL", zip: "62704" },
+          mailingAddress: { line1: "PO Box 500", city: "Chicago", state: "IL", zip: "60601" },
+          responsibleParty: {
+            firstName: "John", lastName: "Johnson",
+            address: { line1: "789 Elm St", city: "Aurora", state: "IL", zip: "60502" },
+          },
+          phone: "3125551234", email: "robert.johnson@example.com",
+          additionalRefs: [
+            { qualifier: "1L", value: "GRP4021" },
+            { qualifier: "3H", value: "CASE9981" },
+          ],
+          reportingCategories: [
+            { description: "Division", refQualifier: "17", refValue: "WEST", effectiveDate: "2026-01-01" },
+            { description: "Union Code", refQualifier: "ZZ", refValue: "LOCAL42", effectiveDate: "" },
+          ],
+          coverages: [
+            {
+              lobKey: "medical", maintenanceTypeCode: "021", coverageLevelCode: "FAM",
+              startDate: "2026-01-01", endDate: "2026-12-31", customRefValue: "CTC100",
+              hiosId: "12345OH1234567",
+              premiumAmount: "550.00",
+              providerName: "Lakeside Family Medicine", providerNpi: "1234567890", providerPhone: "3125551111",
+              cobPayerResponsibilityCode: "S", cobOtherPayerName: "Secondary Health Partners", cobOtherPayerId: "SEC5521",
+            },
+            {
+              lobKey: "dental", maintenanceTypeCode: "021", coverageLevelCode: "FAM",
+              startDate: "2026-01-01", endDate: "2026-12-31", customRefValue: "",
+              hiosId: "",
+              premiumAmount: "45.00",
+              providerName: "Bright Smile Dental Group", providerNpi: "9876543210", providerPhone: "3125552222",
+              cobPayerResponsibilityCode: "P", cobOtherPayerName: "Dental Alliance Network", cobOtherPayerId: "DAN3390",
+            },
+          ],
+          dependents: [
+            {
+              memberId: "MBR1002345-D1", relationshipCode: "19", maintenanceTypeCode: "021",
+              maintenanceEffectiveDate: "2026-01-01",
+              firstName: "Emily", lastName: "Johnson", middleName: "Rose", ssn: "444556666",
+              gender: "F", dob: "2015-08-22",
+              languages: { speak: "ENG", write: "ENG", read: "ENG" },
+              address: { line1: "123 Main Street", city: "Springfield", state: "IL", zip: "62704" },
+              mailingAddress: { line1: "", city: "", state: "", zip: "" },
+              responsibleParty: {
+                firstName: "Robert", lastName: "Johnson",
+                address: { line1: "123 Main Street", city: "Springfield", state: "IL", zip: "62704" },
+              },
+              phone: "", email: "",
+              additionalRefs: [{ qualifier: "1L", value: "GRP4021" }],
+              reportingCategories: [{ description: "Division", refQualifier: "17", refValue: "WEST", effectiveDate: "2026-01-01" }],
+              coverages: [
+                {
+                  lobKey: "medical", maintenanceTypeCode: "021", coverageLevelCode: "FAM",
+                  startDate: "2026-01-01", endDate: "2026-12-31", customRefValue: "CTC100",
+                  hiosId: "12345OH1234567",
+                  premiumAmount: "0.00",
+                  providerName: "Lakeside Family Medicine", providerNpi: "1234567890", providerPhone: "3125551111",
+                  cobPayerResponsibilityCode: "S", cobOtherPayerName: "Secondary Health Partners", cobOtherPayerId: "SEC5521",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          memberId: "MBR1002999", relationshipCode: "18", maintenanceTypeCode: "021",
+          maintenanceEffectiveDate: "2026-02-01",
+          firstName: "Maria", lastName: "Garcia", middleName: "Elena", ssn: "222334444",
+          gender: "F", dob: "1975-11-03",
+          languages: { speak: "SPA", write: "SPA", read: "ENG" },
+          address: { line1: "456 Oak Avenue", city: "Portland", state: "OR", zip: "97201" },
+          mailingAddress: { line1: "", city: "", state: "", zip: "" },
+          responsibleParty: { firstName: "", lastName: "", address: { line1: "", city: "", state: "", zip: "" } },
+          phone: "5035557890", email: "maria.garcia@example.com",
+          additionalRefs: [{ qualifier: "23", value: "CLIENT778" }],
+          reportingCategories: [{ description: "Employee Class", refQualifier: "ZZ", refValue: "EXEC", effectiveDate: "2026-02-01" }],
+          coverages: [
+            {
+              lobKey: "vision", maintenanceTypeCode: "021", coverageLevelCode: "IND",
+              startDate: "2026-02-01", endDate: "2026-12-31", customRefValue: "",
+              hiosId: "67890OR7654321",
+              premiumAmount: "12.50",
+              providerName: "Clearview Vision Center", providerNpi: "5551234567", providerPhone: "5035559999",
+              cobPayerResponsibilityCode: "P", cobOtherPayerName: "Vision Benefits Alliance", cobOtherPayerId: "VBA8842",
+            },
+          ],
+          dependents: [],
+        },
+      ],
+    };
+
+    // Everything lives in this browser's localStorage, and guide.html shares an
+    // origin (and thus localStorage) with the main app — so the demo is injected
+    // directly as a workspace tab, no server round-trip needed.
+    function loadDemoFile() {
+      const WORKSPACE_KEY = "edi834_workspace_v1";
+      const DEMO_TAB_ID = "demo-full-example";
+      const newTab = window.open("", "_blank"); // open synchronously so it isn't blocked as a popup
+      try {
+        const raw = localStorage.getItem(WORKSPACE_KEY);
+        let snapshot = raw ? JSON.parse(raw) : { activeTabId: null, tabs: [] };
+        if (!snapshot || !Array.isArray(snapshot.tabs)) snapshot = { activeTabId: null, tabs: [] };
+
+        const demoTab = {
+          id: DEMO_TAB_ID,
+          meta: {
+            title: "Demo — All Fields Populated",
+            description: "Auto-generated demo showcasing every field and segment this app supports.",
+          },
+          edi: DEMO_PAYLOAD,
+          isDirty: false,
+          collapsed: [],
+        };
+        const existingIdx = snapshot.tabs.findIndex((t) => t.id === DEMO_TAB_ID);
+        if (existingIdx !== -1) snapshot.tabs[existingIdx] = demoTab;
+        else snapshot.tabs.push(demoTab);
+        snapshot.activeTabId = DEMO_TAB_ID;
+
+        localStorage.setItem(WORKSPACE_KEY, JSON.stringify(snapshot));
+        newTab.location.href = "/";
+      } catch (e) {
+        newTab.close();
+        alert("Could not create the demo file — local storage may be unavailable.");
+      }
+    }
+    document.getElementById("btn-load-demo").addEventListener("click", loadDemoFile);
+  </script>
+</body>
+</html>
